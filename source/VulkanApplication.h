@@ -144,6 +144,7 @@ struct SwapChainSupportDetails
 class VulkanApplication
 {
 private:
+	static constexpr uint32_t MaxFramesInFlight = 2;
 	GLFWwindow* window;
 	VkInstance instance;
 	VkDebugUtilsMessengerEXT debugMessenger;
@@ -159,7 +160,7 @@ private:
 
 	VkDescriptorSetLayout descriptorSetLayout;
 	VkDescriptorPool descriptorPool;
-	std::vector<VkDescriptorSet> descriptorSets;
+	std::array<VkDescriptorSet, MaxFramesInFlight> descriptorSets;
 
 	VkPipelineLayout pipelineLayout;
 	VkPipeline graphicsPipeline;
@@ -185,19 +186,22 @@ private:
 	std::vector<VkCommandPool> commandPools;
 	std::vector<VkCommandBuffer> commandBuffers;
 
+	uint32_t swapchainImageCount = 0;
 	std::vector<VkImage> swapChainImages;
 	std::vector<VkImageView> swapChainImageViews;
 	std::vector<VkFramebuffer> swapChainFramebuffers;
 
+	size_t uniformBufferSize = 0;
 	std::vector<VkBuffer> uniformBuffers;
 	std::vector<VkDeviceMemory> uniformBuffersMemory;
 
-	std::vector<VkSemaphore> imageAvailableSemaphores;
+	std::vector<VkSemaphore> presentFinishedSemaphores;
 	std::vector<VkSemaphore> renderFinishedSemaphores;
-	std::vector<VkFence> inFlightFences;
-	std::vector<VkFence> imagesInFlight;
+	std::array<VkFence, MaxFramesInFlight> frameFences;
 
 	size_t currentFrame = 0;
+	uint32_t currentSwapchainSemaphore = 0;
+	uint32_t currentSwapchainImage = 0;
 	bool framebufferResized = false;
 
 	VkSampleCountFlagBits msaaSamples = VK_SAMPLE_COUNT_1_BIT;
@@ -282,7 +286,7 @@ private:
 
 	void initVulkan();
 
-	void updateUniformBuffer(uint32_t currentImage);
+	void updateUniformBuffer();
 	void drawFrame();
 	void mainLoop();
 
