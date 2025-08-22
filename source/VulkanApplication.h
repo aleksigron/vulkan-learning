@@ -210,7 +210,6 @@ private:
 	static void framebufferResizeCallback(GLFWwindow* window, int width, int height);
 
 	void initWindow();
-	bool checkValidationLayerSupport();
 	std::vector<const char*> getRequiredExtensions();
 	void createInstance();
 

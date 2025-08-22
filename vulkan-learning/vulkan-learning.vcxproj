@@ -21,9 +21,11 @@
   <ItemGroup>
     <ClCompile Include="..\source\main.cpp" />
     <ClCompile Include="..\source\VulkanApplication.cpp" />
+    <ClCompile Include="..\source\VulkanUtil.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\source\VulkanApplication.h" />
+    <ClInclude Include="..\source\VulkanUtil.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>

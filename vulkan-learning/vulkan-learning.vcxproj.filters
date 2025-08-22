@@ -21,9 +21,15 @@
     <ClCompile Include="..\source\VulkanApplication.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\source\VulkanUtil.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\source\VulkanApplication.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\source\VulkanUtil.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

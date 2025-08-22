@@ -15,6 +15,8 @@
 #define TINYOBJLOADER_IMPLEMENTATION
 #include "tiny_obj_loader/tiny_obj_loader.h"
 
+#include "VulkanUtil.h"
+
 const std::string TEXTURE_PATH = "textures/viking_room.jpg";
 
 const uint32_t WIDTH = 1600;
@@ -103,36 +105,6 @@ void VulkanApplication::initWindow()
 	glfwSetFramebufferSizeCallback(window, framebufferResizeCallback);
 }
 
-bool VulkanApplication::checkValidationLayerSupport()
-{
-	uint32_t layerCount;
-	vkEnumerateInstanceLayerProperties(&layerCount, nullptr);
-
-	std::vector<VkLayerProperties> availableLayers(layerCount);
-	vkEnumerateInstanceLayerProperties(&layerCount, availableLayers.data());
-
-	for (const char* layerName : validationLayers)
-	{
-		bool layerFound = false;
-
-		for (const auto& layerProperties : availableLayers)
-		{
-			if (strcmp(layerName, layerProperties.layerName) == 0)
-			{
-				layerFound = true;
-				break;
-			}
-		}
-
-		if (!layerFound)
-		{
-			return false;
-		}
-	}
-
-	return true;
-}
-
 std::vector<const char*> VulkanApplication::getRequiredExtensions()
 {
 	uint32_t glfwExtensionCount = 0;
@@ -150,7 +122,7 @@ std::vector<const char*> VulkanApplication::getRequiredExtensions()
 
 void VulkanApplication::createInstance()
 {
-	if (enableValidationLayers && !checkValidationLayerSupport())
+	if (enableValidationLayers && !vulkan::util::checkValidationLayerSupport(validationLayers.data(), validationLayers.size()))
 	{
 		throw std::runtime_error("validation layers requested, but not available!");
 	}
