@@ -542,12 +542,12 @@ VkShaderModule VulkanApplication::createShaderModule(const std::vector<char>& co
 
 void VulkanApplication::createDescriptorSetLayout()
 {
-	VkDescriptorSetLayoutBinding uboLayoutBinding{};
-	uboLayoutBinding.binding = 0;
-	uboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-	uboLayoutBinding.descriptorCount = 1;
-	uboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-	uboLayoutBinding.pImmutableSamplers = nullptr; // Optional
+	VkDescriptorSetLayoutBinding viewBufferLayoutBinding{};
+	viewBufferLayoutBinding.binding = 0;
+	viewBufferLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	viewBufferLayoutBinding.descriptorCount = 1;
+	viewBufferLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+	viewBufferLayoutBinding.pImmutableSamplers = nullptr; // Optional
 
 	VkDescriptorSetLayoutBinding samplerLayoutBinding{};
 	samplerLayoutBinding.binding = 1;
@@ -556,7 +556,7 @@ void VulkanApplication::createDescriptorSetLayout()
 	samplerLayoutBinding.pImmutableSamplers = nullptr;
 	samplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
-	std::array<VkDescriptorSetLayoutBinding, 2> bindings = { uboLayoutBinding, samplerLayoutBinding };
+	std::array<VkDescriptorSetLayoutBinding, 2> bindings = { viewBufferLayoutBinding, samplerLayoutBinding };
 	VkDescriptorSetLayoutCreateInfo layoutInfo{};
 	layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
 	layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
@@ -680,12 +680,18 @@ void VulkanApplication::createGraphicsPipeline()
 	depthStencil.front = {}; // Optional
 	depthStencil.back = {}; // Optional
 
+	// Setup push constants
+	VkPushConstantRange pushConstantRange;
+	pushConstantRange.offset = 0;
+	pushConstantRange.size = sizeof(MeshPushConstants);
+	pushConstantRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+
 	VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
 	pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 	pipelineLayoutInfo.setLayoutCount = 1;
 	pipelineLayoutInfo.pSetLayouts = &descriptorSetLayout;
-	pipelineLayoutInfo.pushConstantRangeCount = 0; // Optional
-	pipelineLayoutInfo.pPushConstantRanges = nullptr; // Optional
+	pipelineLayoutInfo.pPushConstantRanges = &pushConstantRange;
+	pipelineLayoutInfo.pushConstantRangeCount = 1;
 
 	if (vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &pipelineLayout) != VK_SUCCESS)
 	{
@@ -867,7 +873,7 @@ void VulkanApplication::createIndexBuffer(const uint16_t* indices, size_t count,
 
 void VulkanApplication::createUniformBuffers()
 {
-	uniformBufferSize = sizeof(UniformBufferObject) * objects.size();
+	uniformBufferSize = sizeof(ViewUniformBlock) * objects.size();
 	VkDeviceSize bufferSize = uniformBufferSize;
 
 	uniformBuffers.resize(swapchainImageCount);
@@ -1416,6 +1422,8 @@ void VulkanApplication::recordCommandBuffer()
 	vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 	vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
 
+	MeshPushConstants constants;
+
 	for (const RenderObject& obj : objects)
 	{
 		const Mesh& mesh = meshes[obj.meshIndex];
@@ -1427,6 +1435,9 @@ void VulkanApplication::recordCommandBuffer()
 
 		VkDescriptorSet sets[] = { descriptorSets[currentFrame] };
 		vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, sets, 0, nullptr);
+		
+		constants.transform = obj.modelToWorld;
+		vkCmdPushConstants(commandBuffer, pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(MeshPushConstants), &constants);
 
 		vkCmdDrawIndexed(commandBuffer, mesh.indexCount, 1, 0, 0, 0);
 	}
@@ -1527,10 +1538,16 @@ void VulkanApplication::initVulkan()
 	uint32_t roomModel = loadModelFromFile("models/viking_room.obj");
 	//uint32_t jetModel = loadModelFromFile("models/combat_jet.obj");
 
-	createRenderObject(glm::translate(glm::mat4(1.0f), glm::vec3(0.5f, 0.5f, 0.0f)), roomModel);
-	createRenderObject(glm::translate(glm::mat4(1.0f), glm::vec3(0.5f, -0.5f, 0.0f)), roomModel);
-	createRenderObject(glm::translate(glm::mat4(1.0f), glm::vec3(-0.5f, 0.5f, 0.0f)), roomModel);
-	createRenderObject(glm::translate(glm::mat4(1.0f), glm::vec3(-0.5f, -0.5f, 0.0f)), roomModel);
+	auto createTransform = [](float rotate, float x, float y) {
+		glm::mat4 tra = glm::translate(glm::mat4(1.0f), glm::vec3(x, y, 0.0f));
+		return glm::rotate(tra, glm::radians(rotate), glm::vec3(0.0f, 0.0f, 1.0f));
+	};
+
+	constexpr float offs = 0.65f;
+	createRenderObject(createTransform(0.0f, offs, offs), roomModel);
+	createRenderObject(createTransform(270.0f, offs, -offs), roomModel);
+	createRenderObject(createTransform(90.0f, -offs, offs), roomModel);
+	createRenderObject(createTransform(180.0f, -offs, -offs), roomModel);
 
 	//createRenderObject(glm::translate(glm::mat4(1.0f), glm::vec3(2.0f, 0.0f, 2.0f)), jetModel);
 	//createRenderObject(glm::translate(glm::mat4(1.0f), glm::vec3(2.0f, 0.0f, -2.0f)), jetModel);
@@ -1550,24 +1567,19 @@ void VulkanApplication::updateUniformBuffer()
 	auto currentTime = std::chrono::high_resolution_clock::now();
 	float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
 	float timeOverTen = time * 0.1f;
-	float x = std::sinf(timeOverTen) * 3.0f;
-	float y = std::cosf(timeOverTen) * 3.0f;
+	float x = std::sinf(timeOverTen) * 4.0f;
+	float y = std::cosf(timeOverTen) * 4.0f;
 	glm::mat4 view = glm::lookAt(glm::vec3(x, y, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
 	glm::mat4 proj = glm::perspective(glm::radians(45.0f), swapChainExtent.width / (float)swapChainExtent.height, 0.1f, 10.0f);
 	proj[1][1] *= -1;
 
 	void* data;
 	vkMapMemory(device, uniformBuffersMemory[currentFrame], 0, uniformBufferSize, 0, &data);
-	uint8_t* bytes = static_cast<uint8_t*>(data);
 
-	for (size_t i = 0, count = objects.size(); i < count; ++i)
-	{
-		const RenderObject& object = objects[i];
-		UniformBufferObject* ubo = reinterpret_cast<UniformBufferObject*>(bytes + sizeof(UniformBufferObject) * i);
-		ubo->model = object.modelToWorld;
-		ubo->view = view;
-		ubo->proj = proj;
-	}
+	ViewUniformBlock* ubo = static_cast<ViewUniformBlock*>(data);
+	ubo->view = view;
+	ubo->proj = proj;
+	ubo->viewProj = proj * view;
 
 	vkUnmapMemory(device, uniformBuffersMemory[currentFrame]);
 }

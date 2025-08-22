@@ -95,11 +95,16 @@ struct RenderObject
 	uint32_t meshIndex;
 };
 
-struct UniformBufferObject
+struct MeshPushConstants
 {
-	glm::mat4 model;
+	glm::mat4 transform;
+};
+
+struct ViewUniformBlock
+{
 	glm::mat4 view;
 	glm::mat4 proj;
+	glm::mat4 viewProj;
 };
 
 struct FrameImageResources
